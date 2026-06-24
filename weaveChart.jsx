@@ -15,7 +15,7 @@ const C = {
   coral: "#EA5F3E", coralFill: "rgba(234,95,62,0.23)", humanFill: "rgba(67,38,43,0.20)", bench: "#9A958C",
   secondary: "#43262B", track: "#F4F1EC", tooltipMuted: "#D8D1C7", coralDark: "#C9543A"
 };
-const MESH_COLORS = ["#FFFCF7", "#C7BCBA", "#F8C5B6", "#FAD8D0"];
+const MESH_COLORS = ["#FFFCF7", "#E8E4DF", "#F0EDEA", "#FAF8F5"];
 
 // --- shared time axis (numbers read off the screenshots) ---
 const RAW = [
