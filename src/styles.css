@@ -105,13 +105,24 @@ button {
 
 .weave-background::after {
   background:
-    radial-gradient(circle at 18% 12%, rgba(255, 252, 247, 0.4), transparent 32%),
+    radial-gradient(circle at 18% 12%, rgba(255, 252, 247, 0.47), transparent 32%),
     linear-gradient(180deg, rgba(255, 252, 247, 0), rgba(26, 26, 24, 0.04));
   content: "";
   inset: 0;
   pointer-events: none;
   position: absolute;
   z-index: 1;
+}
+
+.weave-background::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.15'/%3E%3C/svg%3E");
+  opacity: 0.14;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  z-index: 2;
 }
 
 .weave-background canvas {
@@ -139,12 +150,13 @@ button {
 
 .weave-segment,
 .weave-compare-group {
-  background: rgba(241, 238, 232, 0.4);
+  background: rgba(241, 238, 232, 0.45);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(26, 26, 24, 0.06);
+  border: 1px solid rgba(26, 26, 24, 0.08);
   display: inline-flex;
   gap: 2px;
+  box-shadow: inset 0 1px 2px rgba(26, 26, 24, 0.04);
 }
 
 .weave-segment {
@@ -177,14 +189,57 @@ button {
   font-size: 13.5px;
   font-weight: 500;
   padding: 7px 14px;
+  position: relative;
 }
 
 .weave-tab.is-active {
   background: var(--surface-raised);
-  box-shadow: 0 1px 2px rgba(26, 26, 24, 0.08);
-  border: 1px solid rgba(26, 26, 24, 0.04);
+  box-shadow: 0 2px 4px rgba(26, 26, 24, 0.08), 0 1px 1px rgba(26, 26, 24, 0.04);
+  border: 1px solid rgba(26, 26, 24, 0.03);
   color: var(--ink);
   font-weight: 600;
+}
+
+.weave-tab-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translate(-50%, -8px) scale(0.95);
+  background: var(--ink);
+  color: var(--surface);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 140ms var(--ease-out-quart), transform 140ms var(--ease-out-quart);
+  box-shadow: 0 4px 12px rgba(26, 26, 24, 0.15);
+  z-index: 100;
+  font-family: 'Switzer', -apple-system, sans-serif;
+}
+
+.weave-tab-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 4px;
+  border-style: solid;
+  border-color: var(--ink) transparent transparent transparent;
+}
+
+.weave-tab-tooltip.is-visible {
+  opacity: 1;
+  transform: translate(-50%, -6px) scale(1);
+}
+
+@media (max-width: 640px), (pointer: coarse) {
+  .weave-tab-tooltip {
+    display: none !important;
+  }
 }
 
 .weave-tab:disabled {
@@ -206,22 +261,20 @@ button {
   background: var(--coral);
   color: var(--surface);
   font-weight: 600;
+  box-shadow: 0 2px 4px rgba(234, 95, 62, 0.18), 0 1px 1px rgba(0, 0, 0, 0.06);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .weave-tab:not(:disabled):hover,
   .weave-compare:not(.is-active):hover {
-    transform: translateY(-0.5px);
     background-color: rgba(26, 26, 24, 0.05);
   }
   
   .weave-tab.is-active:hover {
-    transform: translateY(-0.5px);
     background-color: color-mix(in srgb, var(--surface-raised), #000 3%);
   }
 
   .weave-compare.is-active:hover {
-    transform: translateY(-0.5px);
     background-color: color-mix(in srgb, var(--coral), #000 8%);
   }
 }

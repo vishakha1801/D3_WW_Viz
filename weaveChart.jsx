@@ -12,10 +12,10 @@ import { StaticMeshGradient } from "@paper-design/shaders-react";
 
 const C = {
   bg: "#FFFCF7", ink: "#1A1A18", soft: "#6B6864", faint: "#A7A299", grid: "#ECE9E3",
-  coral: "#EA5F3E", coralFill: "rgba(234,95,62,0.18)", humanFill: "rgba(67,38,43,0.15)", bench: "#9A958C",
-  secondary: "#43262B", track: "#F4F1EC", tooltipMuted: "#D8D1C7"
+  coral: "#EA5F3E", coralFill: "rgba(234,95,62,0.23)", humanFill: "rgba(67,38,43,0.20)", bench: "#9A958C",
+  secondary: "#43262B", track: "#F4F1EC", tooltipMuted: "#D8D1C7", coralDark: "#C9543A"
 };
-const MESH_COLORS = ["#FFFCF7", "#FAD8D0", "#A3908D"];
+const MESH_COLORS = ["#FFFCF7", "#C7BCBA", "#F8C5B6", "#FAD8D0"];
 
 // --- shared time axis (numbers read off the screenshots) ---
 const RAW = [
@@ -86,8 +86,8 @@ const SCALED_TOOLS = TOOLS.map(tool => {
 const VIEWS = {
   aivshuman: {
     form: "area", metric: "Total output",
-    headline: "Output is rising, and AI is doing more of it",
-    subtitle: `Normalized units of work per week, last 13 weeks. AI-assisted share grew from ${firstShare}% to ${lastShare}%.`,
+    headline: "AI vs human output",
+    subtitle: "Compare weekly engineering work done with AI assistance versus human-only output.",
     num: "1,243", percentile: "90th percentile",
     yMax: 2000, yTicks: [0, 500, 1000, 1500, 2000], yFmt: (v) => (v === 0 ? "0" : v >= 1000 ? v / 1000 + "k" : "" + v),
     bench: { median: { v: 780, label: "Median \u00b7 780" }, top10: { v: 1243, label: "Top 10% \u00b7 1.2k" }, top1: { v: 1640, label: "Top 1% \u00b7 1.6k" } },
@@ -107,8 +107,8 @@ const VIEWS = {
   },
   bytype: {
     form: "area", metric: "Total output",
-    headline: "Features drive the majority of output",
-    subtitle: "Normalized units of work by type, per week, last 13 weeks. Platform and KTLO remain steady.",
+    headline: "Work distribution by type",
+    subtitle: "See how weekly engineering output breaks down across features, bugs, and KTLO.",
     num: "1,243", percentile: "90th percentile",
     yMax: 2000, yTicks: [0, 500, 1000, 1500, 2000], yFmt: (v) => (v === 0 ? "0" : v >= 1000 ? v / 1000 + "k" : "" + v),
     bench: { median: { v: 780, label: "Median \u00b7 780" }, top10: { v: 1243, label: "Top 10% \u00b7 1.2k" }, top1: { v: 1640, label: "Top 1% \u00b7 1.6k" } },
@@ -131,8 +131,8 @@ const VIEWS = {
   },
   byteam: {
     form: "area", metric: "Total output",
-    headline: "Product team leads in output volume",
-    subtitle: "Normalized units of work by team, per week, last 13 weeks. Platform and Growth output follows.",
+    headline: "Work distribution by team",
+    subtitle: "See the volume of weekly engineering output delivered by each team.",
     num: "1,243", percentile: "90th percentile",
     yMax: 2000, yTicks: [0, 500, 1000, 1500, 2000], yFmt: (v) => (v === 0 ? "0" : v >= 1000 ? v / 1000 + "k" : "" + v),
     bench: { median: { v: 780, label: "Median \u00b7 780" }, top10: { v: 1243, label: "Top 10% \u00b7 1.2k" }, top1: { v: 1640, label: "Top 1% \u00b7 1.6k" } },
@@ -155,8 +155,8 @@ const VIEWS = {
   },
   byaitool: {
     form: "lines", metric: "Total output",
-    headline: "Claude Code and Cursor carry the work",
-    subtitle: "AI output breakdown by tool, per week, last 13 weeks. Codex and Devin stay marginal.",
+    headline: "AI output breakdown by tool",
+    subtitle: "See which AI tool is driving the most engineering work and output volume.",
     num: "1,243", percentile: "90th percentile",
     yMax: 1200, yTicks: [0, 300, 600, 900, 1200], yFmt: (v) => (v === 0 ? "0" : v >= 1000 ? v / 1000 + "k" : "" + v),
     bench: { median: { v: 780, label: "Median \u00b7 780" }, top10: { v: 1243, label: "Top 10% \u00b7 1.2k" }, top1: { v: 1640, label: "Top 1% \u00b7 1.6k" } },
@@ -175,10 +175,10 @@ const fmtNum = (v) => (v % 1 === 0 ? v.toLocaleString() : v.toFixed(1));
 const reduced = () => typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const yScale = (yMax) => d3.scaleLinear().domain([0, yMax]).range([MT + PH, MT]);
 const motionDuration = (rm, ms) => (rm ? 0 : ms);
-const EASE_OUT = d3.easeExpOut;
-const BENCH_EASE_OUT = d3.easePolyOut.exponent(4);
+const EASE_OUT = d3.easeCubicOut;
+const BENCH_EASE_OUT = d3.easeCubicInOut;
 
-function drawPath(path, rm, duration = 360, delay = 0) {
+function drawPath(path, rm, duration = 450, delay = 0) {
   if (rm) return;
   const node = path.node();
   if (!node || typeof node.getTotalLength !== "function") return;
@@ -200,6 +200,47 @@ export default function WeaveOutputRevamp() {
   const tipRef = useRef(null);
   const chartTitleId = useId();
   const chartDescId = useId();
+
+  const [activeTooltip, setActiveTooltip] = useState(null);
+  const [warmup, setWarmup] = useState(false);
+  const hoverTimeoutRef = useRef(null);
+  const cooldownTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+      if (cooldownTimeoutRef.current) clearTimeout(cooldownTimeoutRef.current);
+    };
+  }, []);
+
+  const handleMouseEnter = (key) => {
+    if (cooldownTimeoutRef.current) {
+      clearTimeout(cooldownTimeoutRef.current);
+      cooldownTimeoutRef.current = null;
+    }
+    if (warmup) {
+      setActiveTooltip(key);
+    } else {
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = setTimeout(() => {
+        setActiveTooltip(key);
+        setWarmup(true);
+      }, 400);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setActiveTooltip(null);
+    if (cooldownTimeoutRef.current) clearTimeout(cooldownTimeoutRef.current);
+    cooldownTimeoutRef.current = setTimeout(() => {
+      setWarmup(false);
+      cooldownTimeoutRef.current = null;
+    }, 300);
+  };
 
   // build the main chart whenever the breakdown changes
   useEffect(() => {
@@ -248,19 +289,19 @@ export default function WeaveOutputRevamp() {
       const clip = svg.append("clipPath").attr("id", clipId);
       clip.append("rect")
         .attr("x", ML).attr("y", MT).attr("width", rm ? PW : 0).attr("height", PH + MB)
-        .transition().duration(motionDuration(rm, 240)).ease(EASE_OUT).attr("width", PW);
+        .transition().duration(motionDuration(rm, 450)).ease(EASE_OUT).attr("width", PW);
 
       svg.append("g").attr("clip-path", `url(#${clipId})`).selectAll("path").data(series).join("path")
         .attr("fill", (s) => cfg.colors[s.key]).attr("d", AREA)
-        .attr("opacity", rm ? 1 : 0.72).transition().duration(motionDuration(rm, 200)).ease(EASE_OUT).attr("opacity", 1);
-      const totalLine = svg.append("path").datum(DATA).attr("fill", "none").attr("stroke", C.secondary).attr("stroke-width", 2.5)
+        .attr("opacity", rm ? 1 : 0).transition().duration(motionDuration(rm, 400)).ease(EASE_OUT).attr("opacity", 1);
+      const totalLine = svg.append("path").datum(DATA).attr("fill", "none").attr("stroke", C.coralDark).attr("stroke-width", 2.5)
         .attr("stroke-linejoin", "round").attr("stroke-linecap", "round").attr("d", LINE)
         .attr("opacity", 1);
-      drawPath(totalLine, rm, 260, 40);
+      drawPath(totalLine, rm, 450, 60);
       svg.append("g").selectAll("circle").data(DATA).join("circle")
-        .attr("cx", (d) => x(d.date)).attr("cy", (d) => y(d.total)).attr("fill", C.bg).attr("stroke", C.secondary)
+        .attr("cx", (d) => x(d.date)).attr("cy", (d) => y(d.total)).attr("fill", C.bg).attr("stroke", C.coralDark)
         .attr("stroke-width", 1.5).attr("r", rm ? 2.8 : 0)
-        .transition().delay((d, i) => motionDuration(rm, 100 + i * 8)).duration(motionDuration(rm, 140)).ease(EASE_OUT).attr("r", 2.8);
+        .transition().delay((d, i) => motionDuration(rm, 150 + i * 12)).duration(motionDuration(rm, 200)).ease(EASE_OUT).attr("r", 2.8);
 
       const last = DATA[DATA.length - 1];
       let cumulativeLabel = 0;
@@ -273,15 +314,7 @@ export default function WeaveOutputRevamp() {
           .attr("font-weight", 600).attr("fill", cfg.lineColors[key]).text(cfg.labels[key]);
       });
 
-      if (view === "aivshuman") {
-        const annot = svg.append("g").attr("opacity", 0);
-        annot.append("circle").attr("cx", x(DATA[11].date)).attr("cy", y(DATA[11].ai)).attr("r", 3.5).attr("fill", C.coral);
-        annot.append("line").attr("x1", x(DATA[11].date)).attr("y1", y(DATA[11].ai)).attr("x2", x(DATA[8].date)).attr("y2", MT + 12)
-          .attr("stroke", C.faint).attr("stroke-width", 1);
-        annot.append("text").attr("x", x(DATA[8].date) - 2).attr("y", MT + 9).attr("text-anchor", "end")
-          .attr("font-size", 11).attr("fill", C.soft).text(`~${lastShare}% AI-assisted`);
-        annot.transition().delay(motionDuration(rm, 170)).duration(motionDuration(rm, 220)).ease(EASE_OUT).attr("opacity", 1);
-      }
+
 
       const dots = cfg.keys.map((key) => {
         return focus.append("circle").attr("r", 4).attr("fill", C.bg).attr("stroke", cfg.lineColors[key]).attr("stroke-width", 2.2);
@@ -328,7 +361,7 @@ export default function WeaveOutputRevamp() {
         const g = svg.append("g").attr("transform", `translate(${lx},${MT + 9})`).attr("opacity", rm ? 1 : 0);
         g.append("rect").attr("width", 10).attr("height", 10).attr("rx", 2).attr("y", -9).attr("fill", s.color);
         g.append("text").attr("x", 14).attr("y", 0).attr("font-size", 11).attr("fill", C.soft).text(s.name);
-        g.transition().duration(motionDuration(rm, 180)).ease(EASE_OUT).attr("opacity", 1).attr("transform", `translate(${lx},${MT + 6})`);
+        g.transition().duration(motionDuration(rm, 300)).ease(EASE_OUT).attr("opacity", 1).attr("transform", `translate(${lx},${MT + 6})`);
         lx += 14 + s.name.length * 6.4 + 16;
       });
       cfg.series.forEach((s, si) => {
@@ -336,10 +369,10 @@ export default function WeaveOutputRevamp() {
         const seriesLine = svg.append("path").datum(pts).attr("fill", "none").attr("stroke", s.color).attr("stroke-width", 2)
           .attr("stroke-linejoin", "round").attr("stroke-linecap", "round").attr("d", LINE)
           .attr("opacity", 1);
-        drawPath(seriesLine, rm, 240, si * 35);
+        drawPath(seriesLine, rm, 450, si * 45);
         svg.append("g").selectAll("circle").data(pts).join("circle")
           .attr("cx", (d) => x(d.date)).attr("cy", (d) => y(d.v)).attr("fill", C.bg).attr("stroke", s.color).attr("stroke-width", 1.5).attr("r", rm ? 2.8 : 0)
-          .transition().delay((d, i) => motionDuration(rm, 80 + si * 30 + i * 6)).duration(motionDuration(rm, 120)).ease(EASE_OUT).attr("r", 2.8);
+          .transition().delay((d, i) => motionDuration(rm, 120 + si * 40 + i * 8)).duration(motionDuration(rm, 180)).ease(EASE_OUT).attr("r", 2.8);
       });
       const dots = cfg.series.map((s) => focus.append("circle").attr("r", 4).attr("fill", C.bg).attr("stroke", s.color).attr("stroke-width", 2.2));
       svg.append("rect").attr("x", ML).attr("y", MT).attr("width", PW).attr("height", PH).attr("fill", "transparent")
@@ -375,7 +408,7 @@ export default function WeaveOutputRevamp() {
     const cfg = VIEWS[view];
     const y = yScale(cfg.yMax);
     const b = cfg.bench[bench];
-    const dur = motionDuration(reduced(), 460);
+    const dur = motionDuration(reduced(), 500);
     svg.select(".benchLine").interrupt().transition().duration(dur).ease(BENCH_EASE_OUT).attr("y1", y(b.v)).attr("y2", y(b.v));
     svg.select(".benchLabel").interrupt().transition().duration(dur).ease(BENCH_EASE_OUT).attr("y", y(b.v) - 6).text(b.label);
   }, [view, bench]);
@@ -383,8 +416,16 @@ export default function WeaveOutputRevamp() {
 
 
   const cfg = VIEWS[view];
+  const TOOLTIPS = {
+    aivshuman: "AI vs human output ratio",
+    byaitool: "Breakdown of work by AI assistant",
+    bytype: "Output split by task category",
+    byteam: "Output split by engineering team",
+  };
+
   const tabBtn = (key, label, wired) => {
     const active = view === key;
+    const isTooltipOpen = activeTooltip === key;
     return (
       <button key={label} onClick={wired ? () => setView(key) : undefined}
         className={`weave-tab ${active ? "is-active" : ""}`}
@@ -393,8 +434,17 @@ export default function WeaveOutputRevamp() {
         role="tab"
         aria-controls="weave-chart-panel"
         aria-disabled={!wired}
-        aria-selected={wired ? active : false}>
+        aria-selected={wired ? active : false}
+        onMouseEnter={() => handleMouseEnter(key)}
+        onMouseLeave={handleMouseLeave}>
         {label}
+        {TOOLTIPS[key] && (
+          <span className={`weave-tab-tooltip ${isTooltipOpen ? "is-visible" : ""}`}
+            style={warmup ? { transitionDuration: "0ms" } : undefined}
+            aria-hidden="true">
+            {TOOLTIPS[key]}
+          </span>
+        )}
       </button>
     );
   };
@@ -424,7 +474,7 @@ export default function WeaveOutputRevamp() {
           waveYShift={0.21}
           mixing={0.93}
           grainMixer={0}
-          grainOverlay={0.56}
+          grainOverlay={0.22}
           scale={1}
           rotation={270}
           offsetX={0}
