@@ -68,7 +68,7 @@
   --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --surface: #fffcf7;
-  --surface-raised: #fff9f0;
+  --surface-raised: #fffdf5;
   --control-track: #f1eee8;
 }
 
@@ -145,7 +145,17 @@ button {
 
 .weave-copy,
 .weave-kpi {
-  animation: weave-state-in 180ms var(--ease-out-quint) both;
+  animation: weave-state-in 220ms var(--ease-out-quint) both;
+}
+
+.weave-copy {
+  min-height: 94px;
+}
+
+@media (max-width: 640px) {
+  .weave-copy {
+    min-height: auto;
+  }
 }
 
 .weave-segment,
@@ -335,7 +345,7 @@ button {
 @keyframes weave-state-in {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(2px);
   }
 
   to {

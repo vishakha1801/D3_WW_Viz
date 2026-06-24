@@ -355,15 +355,6 @@ export default function WeaveOutputRevamp() {
     } else {
       // four-line view
       const LINE = d3.line().x((d) => x(d.date)).y((d) => y(d.v)).curve(CURVE);
-      // compact legend row, top-left (above the lines and the benchmark)
-      let lx = ML + 6;
-      cfg.series.forEach((s) => {
-        const g = svg.append("g").attr("transform", `translate(${lx},${MT + 9})`).attr("opacity", rm ? 1 : 0);
-        g.append("rect").attr("width", 10).attr("height", 10).attr("rx", 2).attr("y", -9).attr("fill", s.color);
-        g.append("text").attr("x", 14).attr("y", 0).attr("font-size", 11).attr("fill", C.soft).text(s.name);
-        g.transition().duration(motionDuration(rm, 300)).ease(EASE_OUT).attr("opacity", 1).attr("transform", `translate(${lx},${MT + 6})`);
-        lx += 14 + s.name.length * 6.4 + 16;
-      });
       cfg.series.forEach((s, si) => {
         const pts = s.values.map((v, i) => ({ date: DATA[i].date, v }));
         const seriesLine = svg.append("path").datum(pts).attr("fill", "none").attr("stroke", s.color).attr("stroke-width", 2)
@@ -373,6 +364,38 @@ export default function WeaveOutputRevamp() {
         svg.append("g").selectAll("circle").data(pts).join("circle")
           .attr("cx", (d) => x(d.date)).attr("cy", (d) => y(d.v)).attr("fill", C.bg).attr("stroke", s.color).attr("stroke-width", 1.5).attr("r", rm ? 2.8 : 0)
           .transition().delay((d, i) => motionDuration(rm, 120 + si * 40 + i * 8)).duration(motionDuration(rm, 180)).ease(EASE_OUT).attr("r", 2.8);
+      });
+
+      // Align right-side legend labels next to the end of their lines
+      const labelData = cfg.series.map((s) => {
+        const lastVal = s.values[s.values.length - 1];
+        return {
+          name: s.name,
+          color: s.color,
+          y: y(lastVal),
+        };
+      }).sort((a, b) => a.y - b.y);
+
+      // Resolve label overlaps (minimum gap of 13px)
+      const minGap = 13;
+      for (let iter = 0; iter < 10; iter++) {
+        for (let j = 0; j < labelData.length - 1; j++) {
+          if (labelData[j + 1].y - labelData[j].y < minGap) {
+            const overlap = minGap - (labelData[j + 1].y - labelData[j].y);
+            labelData[j].y -= overlap / 2;
+            labelData[j + 1].y += overlap / 2;
+          }
+        }
+      }
+
+      labelData.forEach((ld) => {
+        svg.append("text")
+          .attr("x", ML + PW + 8)
+          .attr("y", ld.y + 4)
+          .attr("font-size", 11.5)
+          .attr("font-weight", 600)
+          .attr("fill", ld.color)
+          .text(ld.name);
       });
       const dots = cfg.series.map((s) => focus.append("circle").attr("r", 4).attr("fill", C.bg).attr("stroke", s.color).attr("stroke-width", 2.2));
       svg.append("rect").attr("x", ML).attr("y", MT).attr("width", PW).attr("height", PH).attr("fill", "transparent")
